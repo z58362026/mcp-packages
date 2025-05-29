@@ -1,43 +1,72 @@
 # MCP Packages
 
-这是一个使用 pnpm 管理的 monorepo 项目。
+这是一个基于 Model Context Protocol (MCP) 的工具包集合，提供了各种实用的工具服务。
 
 ## 项目结构
 
 ```
-.
-├── apps/          # 应用程序目录
-├── packages/      # 共享包目录
-├── pnpm-workspace.yaml
-└── package.json
+mcp-packages/
+├── packages/
+│   ├── github-search/    # GitHub 搜索工具
+│   └── time/            # 时间处理工具
+├── scripts/             # 项目脚本
+└── ...配置文件
 ```
+
+## 可用工具包
+
+### 1. GitHub 搜索工具 (github-search)
+
+提供 GitHub 仓库、代码、Issues 和用户的搜索功能。
+
+[详细文档](./packages/github-search/README.md)
+
+### 2. 时间处理工具 (time)
+
+提供时间获取和时区转换功能。
+
+[详细文档](./packages/time/README.md)
 
 ## 开发环境要求
 
-- Node.js >= 16
+- Node.js >= 18
 - pnpm >= 8
 
-## 安装依赖
+## 安装
 
 ```bash
+# 安装依赖
 pnpm install
 ```
 
-## 开发命令
+## 开发
 
-- `pnpm build` - 构建所有包
-- `pnpm dev` - 启动开发环境
-- `pnpm test` - 运行测试
-- `pnpm lint` - 运行代码检查
+```bash
+# 构建所有包
+pnpm build
 
-## 添加新包
+# 开发模式
+pnpm dev
+```
 
-1. 在 `packages` 目录下创建新的包目录
-2. 在包目录中初始化 `package.json`
-3. 在根目录运行 `pnpm install` 更新工作空间
+## 项目配置
 
-## 添加新应用
+项目使用以下主要配置：
 
-1. 在 `apps` 目录下创建新的应用目录
-2. 在应用目录中初始化 `package.json`
-3. 在根目录运行 `pnpm install` 更新工作空间 
+- TypeScript
+- ESLint
+- Prettier
+- Husky (Git hooks)
+- Turborepo (构建系统)
+
+## 贡献指南
+
+1. Fork 项目
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建 Pull Request
+
+## 许可证
+
+MIT

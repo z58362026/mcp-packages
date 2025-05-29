@@ -1,5 +1,5 @@
 {
-  "name": "time",
+  "name": "@z58362026/time",
   "version": "1.0.0",
   "bin": {
     "mcp-server-time": "dist/index.js"
