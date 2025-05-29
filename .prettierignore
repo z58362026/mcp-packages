@@ -1,0 +1,18 @@
+# Build output
+dist
+build
+
+# Dependencies
+node_modules
+.pnpm-store
+
+# Cache
+.cache
+.eslintcache
+
+# Coverage
+coverage
+
+# Misc
+.DS_Store
+*.pem 
