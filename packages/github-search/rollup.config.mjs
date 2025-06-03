@@ -6,17 +6,17 @@ import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import babel from '@rollup/plugin-babel';
 import replace from '@rollup/plugin-replace';
-import dotenv from 'dotenv';
-import path from 'path';
+// import dotenv from 'dotenv';
+// import path from 'path';
 
 // 自动加载对应的 .env 文件
-const envFilePath = path.resolve(process.cwd(), `.env`);
-const env = dotenv.config({ path: envFilePath }).parsed || {};
-// 将其转为 Rollup 能识别的格式
-const envWithProcessPrefix = {};
-for (const k in env) {
-  envWithProcessPrefix[`process.env.${k}`] = JSON.stringify(env[k]);
-}
+// const envFilePath = path.resolve(process.cwd(), `.env`);
+// const env = dotenv.config({ path: envFilePath }).parsed || {};
+// // 将其转为 Rollup 能识别的格式
+// const envWithProcessPrefix = {};
+// for (const k in env) {
+//   envWithProcessPrefix[`process.env.${k}`] = JSON.stringify(env[k]);
+// }
 
 export default [
   {
@@ -38,7 +38,7 @@ export default [
       typescript({ tsconfig: './tsconfig.json' }), // 指定 tsconfig.json
       replace({
         preventAssignment: true,
-        ...envWithProcessPrefix,
+        // ...envWithProcessPrefix,
       }),
       del({ targets: 'dist/*' }),
       terser(),
