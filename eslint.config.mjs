@@ -17,6 +17,7 @@ export default [
       'apps/',
       '**/webpack.config.js',
       '**/generator/template/**',
+      'packages/*/scripts/**',
     ],
   },
   js.configs.recommended,
