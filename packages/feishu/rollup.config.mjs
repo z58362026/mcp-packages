@@ -22,32 +22,19 @@ export default [
       },
     ],
     plugins: [
-      del({ targets: 'dist/*' }),
       json(),
+      typescript({ tsconfig: './tsconfig.json' }), // 指定 tsconfig.json
+      del({ targets: 'dist/*' }),
+      terser(),
       resolve({
         preferBuiltins: true,
-        extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
       }),
-      commonjs({
-        extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
-      }),
-      typescript({
-        tsconfig: './tsconfig.json',
-      }),
+      commonjs(),
+
       babel({
         exclude: 'node_modules/**',
-        include: 'src/**',
-        presets: [['@babel/preset-env', { targets: { node: 'current' } }]],
-        extensions: ['.ts', '.tsx', '.js', '.jsx'],
-        babelHelpers: 'bundled',
+        presets: ['@babel/preset-env'],
       }),
-      terser({}),
     ],
-    external: ['@modelcontextprotocol/sdk', 'zod', 'zod-to-json-schema', 'fs/promises', 'path'],
-    onwarn(warning, warn) {
-      // 忽略某些警告
-      if (warning.code === 'CIRCULAR_DEPENDENCY') return;
-      warn(warning);
-    },
   },
 ];

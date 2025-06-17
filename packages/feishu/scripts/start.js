@@ -40,7 +40,8 @@
 import { config } from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
-import { start } from '@modelcontextprotocol/inspector';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -59,24 +60,28 @@ if (missingEnvVars.length > 0) {
   process.exit(1);
 }
 
-// Server configuration object
-const serverConfig = {
-  feishuAppId: process.env.FEISHU_APP_ID,
-  feishuAppSecret: process.env.FEISHU_APP_SECRET,
-  port: parseInt(process.env.PORT || '3000', 10),
-  debug: process.env.DEBUG === 'true',
-};
+// Create MCP server
+const server = new McpServer({
+  name: 'feishu-doc-analysis-mcp-server',
+  version: '1.0.0',
+});
 
 // Start the server
-try {
-  console.log('Starting Feishu MCP server...');
-  console.log(`Port: ${serverConfig.port}`);
-  console.log(`Debug mode: ${serverConfig.debug ? 'enabled' : 'disabled'}`);
+async function runServer() {
+  try {
+    console.log('Starting Feishu MCP server...');
 
-  start(serverConfig);
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
 
-  console.log('Server started successfully!');
-} catch (error) {
-  console.error('Failed to start server:', error);
-  process.exit(1);
+    console.error('飞书文档分析 MCP 服务器已在 stdio 上启动');
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
 }
+
+runServer().catch(error => {
+  console.error('Server error:', error);
+  process.exit(1);
+});
