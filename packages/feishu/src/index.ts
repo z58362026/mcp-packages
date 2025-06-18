@@ -4,6 +4,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { zodToJsonSchema } from 'zod-to-json-schema';
+import fs from 'fs/promises';
+import path from 'path';
 
 import packageJson from '../package.json';
 
@@ -31,9 +33,9 @@ const DocContentParamsSchema = z.object({
   docUrl: z.string().optional().describe('飞书文档的完整 URL'),
 });
 
-// 定义获取飞书 Wiki 内容的输入参数
-const WikiContentParamsSchema = z.object({
-  wikiUrl: z.string().optional().describe('飞书 Wiki 的完整 URL'),
+// 定义获取飞书知识空间文档的输入参数
+const WikiSpaceParamsSchema = z.object({
+  nodeToken: z.string().describe('知识空间节点的 token'),
 });
 
 // 定义分析文档的输入参数
@@ -80,9 +82,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: zodToJsonSchema(DocContentParamsSchema),
       },
       {
-        name: 'get_feishu_wiki',
-        description: '获取飞书 Wiki 内容',
-        inputSchema: zodToJsonSchema(WikiContentParamsSchema),
+        name: 'get_wiki_space_doc',
+        description: '获取飞书知识空间文档内容',
+        inputSchema: zodToJsonSchema(WikiSpaceParamsSchema),
       },
       {
         name: 'analyze_doc',
@@ -124,35 +126,9 @@ function extractDocTokenFromUrl(url: string): string {
   return match[1];
 }
 
-// 从 URL 中提取 Wiki 页面 token
-function extractWikiPageTokenFromUrl(url: string): string {
-  const match = url.match(/\/wiki\/([^/]+)/);
-  if (!match) {
-    throw new Error('无效的飞书 Wiki URL');
-  }
-  return match[1];
-}
-
-// 获取 Wiki 页面详情
-async function getWikiPageDetail(pageToken: string, accessToken: string) {
-  const url = `https://open.feishu.cn/open-apis/wiki/v2/page/detail?page_token=${pageToken}`;
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error(`获取 Wiki 页面详情失败: ${res.status} ${res.statusText}`);
-  }
-
-  const data = await res.json();
-  return data.data;
-}
-
 // 获取文档内容
 async function getDocContent(docToken: string, accessToken: string) {
-  const url = `https://open.feishu.cn/open-apis/docx/v1/documents/${docToken}/content`;
+  const url = `https://open.feishu.cn/open-apis/docx/v1/documents/${docToken}/raw_content`;
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -164,23 +140,24 @@ async function getDocContent(docToken: string, accessToken: string) {
   }
 
   const data = await res.json();
-  return data.data;
+  return data.data.content;
 }
 
-// 获取 Wiki 内容
-async function getWikiContent(wikiUrl: string, accessToken: string) {
-  // 从 URL 中提取页面 token
-  const pageToken = extractWikiPageTokenFromUrl(wikiUrl);
+// 获取知识空间节点信息
+async function getWikiSpaceNode(nodeToken: string, accessToken: string) {
+  const url = `https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node?token=${nodeToken}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
 
-  // 获取 Wiki 页面详情
-  const pageDetail = await getWikiPageDetail(pageToken, accessToken);
-
-  // 如果页面绑定了文档，获取文档内容
-  if (pageDetail.obj_type === 'docx' && pageDetail.obj_token) {
-    return await getDocContent(pageDetail.obj_token, accessToken);
+  if (!res.ok) {
+    throw new Error(`获取知识空间节点信息失败: ${res.status} ${res.statusText}`);
   }
 
-  throw new Error('Wiki 页面未绑定文档或类型不支持');
+  const data = await res.json();
+  return data.data.node;
 }
 
 // 预设的前端知识库配置
@@ -589,26 +566,40 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         }
 
         const content = await getDocContent(token, accessToken);
-
         return {
           content: [{ type: 'text', text: JSON.stringify(content, null, 2) }],
         };
       }
 
-      // 获取飞书 Wiki 内容
-      case 'get_feishu_wiki': {
-        const { wikiUrl } = WikiContentParamsSchema.parse(request.params.arguments);
+      // 获取飞书知识空间文档内容
+      case 'get_wiki_space_doc': {
+        const { nodeToken } = WikiSpaceParamsSchema.parse(request.params.arguments);
         const accessToken = await getFeishuAccessToken();
 
-        if (!wikiUrl) {
-          throw new Error('必须提供 wikiUrl');
+        // 获取节点信息
+        const nodeInfo = await getWikiSpaceNode(nodeToken, accessToken);
+
+        // 如果节点类型是文档，获取文档内容
+        if (nodeInfo.obj_type === 'docx' && nodeInfo.obj_token) {
+          const content = await getDocContent(nodeInfo.obj_token, accessToken);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(
+                  {
+                    nodeInfo,
+                    content,
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
         }
 
-        const content = await getWikiContent(wikiUrl, accessToken);
-
-        return {
-          content: [{ type: 'text', text: JSON.stringify(content, null, 2) }],
-        };
+        throw new Error('节点不是文档类型或未绑定文档');
       }
 
       // 分析文档并生成代码
@@ -624,7 +615,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           const token = docToken || (docUrl ? extractDocTokenFromUrl(docUrl) : '');
           docContent = await getDocContent(token, accessToken);
         } else if (wikiUrl) {
-          docContent = await getWikiContent(wikiUrl, accessToken);
+          docContent = await getDocContent(wikiUrl, accessToken);
         } else {
           throw new Error('必须提供文档或 Wiki 的访问信息');
         }

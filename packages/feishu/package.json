@@ -1,7 +1,6 @@
 {
   "name": "@z58362026/feishu",
   "version": "1.0.0",
-  "type": "module",
   "bin": {
     "mcp-server-time": "dist/index.cjs.js"
   },
