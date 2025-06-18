@@ -35,7 +35,15 @@ const DocContentParamsSchema = z.object({
 
 // 定义获取飞书知识空间文档的输入参数
 const WikiSpaceParamsSchema = z.object({
-  nodeToken: z.string().describe('知识空间节点的 token'),
+  nodeToken: z.string().optional().describe('知识空间节点的 token'),
+  wikiUrl: z.string().optional().describe('飞书知识空间的完整 URL'),
+});
+
+// 定义生成代码的输入参数
+const GenerateCodeParamsSchema = z.object({
+  content: z.string().describe('文档内容'),
+  framework: z.string().describe('使用的框架，如 React、Vue 等'),
+  outputPath: z.string().optional().describe('代码输出路径'),
 });
 
 // 定义分析文档的输入参数
@@ -87,6 +95,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: zodToJsonSchema(WikiSpaceParamsSchema),
       },
       {
+        name: 'generate_code',
+        description: '根据文档内容生成代码',
+        inputSchema: zodToJsonSchema(GenerateCodeParamsSchema),
+      },
+      {
         name: 'analyze_doc',
         description: '分析飞书文档并生成代码',
         inputSchema: zodToJsonSchema(AnalyzeDocParamsSchema),
@@ -122,6 +135,15 @@ function extractDocTokenFromUrl(url: string): string {
   const match = url.match(/\/docx\/([^/]+)/);
   if (!match) {
     throw new Error('无效的飞书文档 URL');
+  }
+  return match[1];
+}
+
+// 从 URL 中提取知识空间节点 token
+function extractWikiNodeTokenFromUrl(url: string): string {
+  const match = url.match(/\/wiki\/([^/]+)/);
+  if (!match) {
+    throw new Error('无效的飞书知识空间 URL');
   }
   return match[1];
 }
@@ -472,76 +494,87 @@ async function analyzeDocAndGenerateCode(
   },
   outputPath?: string
 ) {
-  // 如果知识库返回的是分析结果，直接使用
-  if (knowledgeBase.analysis && knowledgeBase.structure && knowledgeBase.code) {
-    const result = knowledgeBase;
-
-    // 如果指定了输出路径，将代码写入文件系统
-    if (outputPath) {
-      await writeCodeToFileSystem(result, outputPath);
-    }
-
-    return result;
-  }
-
-  // TODO: 调用大模型 API 分析文档内容
-  // 1. 结合知识库内容分析文档
-  // 2. 根据项目规范生成代码结构
-  // 3. 生成符合规范的代码
-
-  // 示例返回
-  const result = {
-    analysis: {
-      modules: ['用户管理', '权限控制', '数据存储'],
-      requirements: ['RESTful API', '数据库设计', '前端组件'],
-    },
-    structure: {
-      src: {
-        components: {},
-        services: {},
-        utils: {},
-      },
-      test: {
-        unit: {},
-        integration: {},
-      },
-      docs: {
-        api: {},
-        guides: {},
-      },
-    },
-    code: {
-      // 根据项目类型和框架生成相应的代码
+  const structure = {
+    src: {
       components: {},
       services: {},
       utils: {},
+      types: {},
+      hooks: {},
+    },
+    test: {
+      unit: {},
+      integration: {},
+    },
+    docs: {
+      api: {},
+      guides: {},
     },
   };
 
-  // 如果指定了输出路径，将代码写入文件系统
+  // 生成分析报告
+  const analysisReport = {
+    projectInfo: {
+      type: projectSpec.type,
+      framework: projectSpec.framework,
+      structure: projectSpec.structure,
+      conventions: projectSpec.conventions,
+    },
+    documentAnalysis: {
+      content: docContent,
+      summary: '文档内容分析摘要',
+      keyPoints: ['关键点1', '关键点2', '关键点3'],
+    },
+    knowledgeBase: {
+      content: knowledgeBase,
+      standards: knowledgeBase.standards || {},
+      templates: knowledgeBase.templates || {},
+    },
+    generatedStructure: structure,
+    recommendations: [
+      '建议使用 TypeScript 进行类型安全开发',
+      '建议使用 ESLint 和 Prettier 进行代码规范',
+      '建议使用 React Query 进行数据获取',
+    ],
+  };
+
+  // 如果指定了输出路径，将分析报告写入文件
   if (outputPath) {
-    await writeCodeToFileSystem(result, outputPath);
+    const reportPath = `${outputPath}/analysis-report.json`;
+    await fs.mkdir(path.dirname(reportPath), { recursive: true });
+    await fs.writeFile(reportPath, JSON.stringify(analysisReport, null, 2), 'utf-8');
   }
 
-  return result;
+  return {
+    analysis: analysisReport,
+    structure: structure,
+    message: '分析完成，请将 analysis-report.json 文件内容提供给 Cursor 进行代码生成',
+  };
 }
 
-// 将代码写入文件系统
-async function writeCodeToFileSystem(codeStructure: any, basePath: string) {
-  async function writeDirectory(structure: any, currentPath: string) {
-    for (const [name, content] of Object.entries(structure)) {
-      const fullPath = path.join(currentPath, name);
-      if (typeof content === 'object' && content !== null) {
-        await fs.mkdir(fullPath, { recursive: true });
-        await writeDirectory(content, fullPath);
-      } else {
-        await fs.writeFile(fullPath, content as string);
-      }
-    }
+// 生成代码（简化版本，仅用于测试）
+async function generateCode(content: string, framework: string, outputPath?: string) {
+  // 生成简单的代码模板
+  const codeTemplate = `
+// 根据文档内容生成的 ${framework} 代码模板
+// 请将以下分析内容提供给 Cursor 进行代码生成：
+
+/*
+分析内容：
+${content}
+
+框架：${framework}
+
+请根据以上分析内容生成相应的代码。
+*/
+`;
+
+  // 如果指定了输出路径，将代码模板写入文件
+  if (outputPath) {
+    await fs.writeFile(outputPath, codeTemplate, 'utf-8');
   }
 
-  await fs.mkdir(basePath, { recursive: true });
-  await writeDirectory(codeStructure, basePath);
+  return codeTemplate;
 }
 
 server.setRequestHandler(CallToolRequestSchema, async request => {
@@ -573,11 +606,20 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
       // 获取飞书知识空间文档内容
       case 'get_wiki_space_doc': {
-        const { nodeToken } = WikiSpaceParamsSchema.parse(request.params.arguments);
+        const { nodeToken, wikiUrl } = WikiSpaceParamsSchema.parse(request.params.arguments);
         const accessToken = await getFeishuAccessToken();
 
+        let token = nodeToken;
+        if (wikiUrl) {
+          token = extractWikiNodeTokenFromUrl(wikiUrl);
+        }
+
+        if (!token) {
+          throw new Error('必须提供 nodeToken 或 wikiUrl');
+        }
+
         // 获取节点信息
-        const nodeInfo = await getWikiSpaceNode(nodeToken, accessToken);
+        const nodeInfo = await getWikiSpaceNode(token, accessToken);
 
         // 如果节点类型是文档，获取文档内容
         if (nodeInfo.obj_type === 'docx' && nodeInfo.obj_token) {
@@ -602,6 +644,17 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
         throw new Error('节点不是文档类型或未绑定文档');
       }
 
+      // 生成代码
+      case 'generate_code': {
+        const { content, framework, outputPath } = GenerateCodeParamsSchema.parse(
+          request.params.arguments
+        );
+        const generatedCode = await generateCode(content, framework, outputPath);
+        return {
+          content: [{ type: 'text', text: generatedCode }],
+        };
+      }
+
       // 分析文档并生成代码
       case 'analyze_doc': {
         const { docToken, docUrl, wikiUrl, knowledgeBase, projectSpec, outputPath } =
@@ -615,7 +668,13 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
           const token = docToken || (docUrl ? extractDocTokenFromUrl(docUrl) : '');
           docContent = await getDocContent(token, accessToken);
         } else if (wikiUrl) {
-          docContent = await getDocContent(wikiUrl, accessToken);
+          const nodeToken = extractWikiNodeTokenFromUrl(wikiUrl);
+          const nodeInfo = await getWikiSpaceNode(nodeToken, accessToken);
+          if (nodeInfo.obj_type === 'docx' && nodeInfo.obj_token) {
+            docContent = await getDocContent(nodeInfo.obj_token, accessToken);
+          } else {
+            throw new Error('Wiki 页面未绑定文档或类型不支持');
+          }
         } else {
           throw new Error('必须提供文档或 Wiki 的访问信息');
         }
