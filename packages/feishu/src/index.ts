@@ -42,7 +42,7 @@ const WikiSpaceParamsSchema = z.object({
 // 定义生成代码的输入参数
 const GenerateCodeParamsSchema = z.object({
   content: z.string().describe('文档内容'),
-  framework: z.string().describe('使用的框架，如 React、Vue 等'),
+  framework: z.string().default('React').describe('使用的框架，如 React、Vue 等'),
   outputPath: z.string().optional().describe('代码输出路径'),
 });
 
@@ -53,7 +53,10 @@ const AnalyzeDocParamsSchema = z.object({
   wikiUrl: z.string().optional().describe('飞书 Wiki 的完整 URL'),
   knowledgeBase: z
     .object({
-      type: z.enum(['local', 'remote']).describe('知识库类型：local（本地）或 remote（远程）'),
+      type: z
+        .enum(['local', 'remote'])
+        .default('remote')
+        .describe('知识库类型：local（本地）或 remote（远程）'),
       path: z.string().optional().describe('本地知识库路径，当 type 为 local 时必填'),
       url: z.string().optional().describe('远程知识库 URL，当 type 为 remote 时必填'),
       analysisEndpoint: z
@@ -61,20 +64,43 @@ const AnalyzeDocParamsSchema = z.object({
         .optional()
         .describe('远程知识库分析接口，当 type 为 remote 时可选'),
     })
+    .default({
+      type: 'remote',
+      url: 'https://example.com/knowledge-base.json',
+    })
     .describe('知识库配置'),
   projectSpec: z
     .object({
-      type: z.enum(['frontend', 'backend', 'fullstack']).describe('项目类型'),
-      framework: z.string().describe('使用的框架，如 React、Vue、Express 等'),
+      type: z.enum(['frontend', 'backend', 'fullstack']).default('frontend').describe('项目类型'),
+      framework: z.string().default('Vue').describe('使用的框架，如 React、Vue、Express 等'),
       structure: z
         .object({
           src: z.string().optional().describe('源代码目录结构'),
           test: z.string().optional().describe('测试目录结构'),
           docs: z.string().optional().describe('文档目录结构'),
         })
+        .default({
+          src: 'src',
+          test: 'test',
+          docs: 'docs',
+        })
         .optional()
         .describe('项目目录结构配置'),
-      conventions: z.array(z.string()).optional().describe('项目规范，如命名规范、代码风格等'),
+      conventions: z
+        .array(z.string())
+        .default(['使用 TypeScript', '使用函数组件和 Hooks', '使用 ESLint 和 Prettier'])
+        .optional()
+        .describe('项目规范，如命名规范、代码风格等'),
+    })
+    .default({
+      type: 'frontend',
+      framework: 'React',
+      structure: {
+        src: 'src',
+        test: 'test',
+        docs: 'docs',
+      },
+      conventions: ['使用 TypeScript', '使用函数组件和 Hooks', '使用 ESLint 和 Prettier'],
     })
     .describe('项目规范配置'),
   outputPath: z.string().optional().describe('代码输出路径，不指定则返回代码内容'),
@@ -184,69 +210,6 @@ async function getWikiSpaceNode(nodeToken: string, accessToken: string) {
 
 // 预设的前端知识库配置
 const PRESET_FRONTEND_CONFIGS = {
-  react: {
-    standards: {
-      naming: {
-        components: 'PascalCase',
-        hooks: 'useCamelCase',
-        constants: 'UPPER_CASE',
-        files: 'kebab-case',
-      },
-      structure: {
-        components: 'src/components',
-        hooks: 'src/hooks',
-        services: 'src/services',
-        utils: 'src/utils',
-        types: 'src/types',
-        styles: 'src/styles',
-        assets: 'src/assets',
-      },
-      conventions: [
-        '使用 TypeScript',
-        '使用函数组件和 Hooks',
-        '使用 ESLint 和 Prettier',
-        '使用 CSS Modules 或 styled-components',
-        '使用 React Query 进行数据获取',
-        '使用 React Router 进行路由管理',
-      ],
-    },
-    templates: {
-      component: {
-        path: 'templates/react/component.tsx',
-        content: `import React from 'react';
-import styles from './styles.module.css';
-
-interface Props {
-  // 组件属性
-}
-
-export const Component: React.FC<Props> = ({ /* props */ }) => {
-  return (
-    <div className={styles.container}>
-      {/* 组件内容 */}
-    </div>
-  );
-};`,
-      },
-      hook: {
-        path: 'templates/react/hook.ts',
-        content: `import { useState, useEffect } from 'react';
-
-export const useHook = () => {
-  const [state, setState] = useState();
-
-  useEffect(() => {
-    // 副作用逻辑
-  }, []);
-
-  return {
-    state,
-    // 其他返回值
-  };
-};`,
-      },
-    },
-  },
   vue: {
     standards: {
       naming: {
@@ -257,19 +220,21 @@ export const useHook = () => {
       },
       structure: {
         components: 'src/components',
-        composables: 'src/composables',
         services: 'src/services',
         utils: 'src/utils',
         types: 'src/types',
         styles: 'src/styles',
         assets: 'src/assets',
+        pages: 'src/pages',
+        api: 'src/api',
+        configs: 'src/configs',
       },
       conventions: [
-        '使用 TypeScript',
-        '使用 Composition API',
+        // '使用 TypeScript',
+        '使用 选项式 API',
         '使用 ESLint 和 Prettier',
-        '使用 SCSS 或 Less',
-        '使用 Pinia 进行状态管理',
+        '使用 Less',
+        '使用 Vuex 进行状态管理',
         '使用 Vue Router 进行路由管理',
       ],
     },
@@ -291,83 +256,6 @@ export const useHook = () => {
   // 组件样式
 }
 </style>`,
-      },
-      composable: {
-        path: 'templates/vue/composable.ts',
-        content: `import { ref, onMounted } from 'vue';
-
-export const useComposable = () => {
-  const state = ref();
-
-  onMounted(() => {
-    // 初始化逻辑
-  });
-
-  return {
-    state,
-    // 其他返回值
-  };
-};`,
-      },
-    },
-  },
-  next: {
-    standards: {
-      naming: {
-        components: 'PascalCase',
-        hooks: 'useCamelCase',
-        constants: 'UPPER_CASE',
-        files: 'kebab-case',
-      },
-      structure: {
-        components: 'src/components',
-        hooks: 'src/hooks',
-        services: 'src/services',
-        utils: 'src/utils',
-        types: 'src/types',
-        styles: 'src/styles',
-        assets: 'public',
-        pages: 'src/pages',
-        api: 'src/pages/api',
-      },
-      conventions: [
-        '使用 TypeScript',
-        '使用 App Router',
-        '使用 ESLint 和 Prettier',
-        '使用 Tailwind CSS',
-        '使用 SWR 或 React Query',
-        '使用 NextAuth.js 进行认证',
-      ],
-    },
-    templates: {
-      page: {
-        path: 'templates/next/page.tsx',
-        content: `import { Metadata } from 'next';
-
-export const metadata: Metadata = {
-  title: 'Page Title',
-  description: 'Page description',
-};
-
-export default function Page() {
-  return (
-    <main>
-      {/* 页面内容 */}
-    </main>
-  );
-}`,
-      },
-      api: {
-        path: 'templates/next/api.ts',
-        content: `import { NextApiRequest, NextApiResponse } from 'next';
-
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // API 处理逻辑
-  res.status(200).json({ message: 'Success' });
-}`,
       },
     },
   },
